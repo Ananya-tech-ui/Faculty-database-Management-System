@@ -1,5 +1,4 @@
 Faculty Research Database System
-
 https://img.shields.io/badge/MySQL-8.0-blue
 https://img.shields.io/badge/Python-3.8%252B-yellow
 https://img.shields.io/badge/AWS_RDS-Compatible-orange
