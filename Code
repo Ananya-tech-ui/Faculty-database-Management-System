@@ -1,0 +1,118 @@
+# Sample script to load data from Excel to MySQL
+def load_faculty_data_from_excel(file_path):
+    try:
+        # Create SQLAlchemy engine
+        engine = create_engine('mysql+pymysql://admin:yourpassword@your-rds-endpoint.rds.amazonaws.com:3306/faculty_research_db')
+        
+        # Read Excel sheets
+        faculty_df = pd.read_excel(file_path, sheet_name='Faculty')
+        journal_df = pd.read_excel(file_path, sheet_name='Journal Publications')
+        conference_df = pd.read_excel(file_path, sheet_name='Conference Publications')
+        
+        # Load data to MySQL
+        faculty_df.to_sql('faculty', engine, if_exists='append', index=False)
+        journal_df.to_sql('journal_publications', engine, if_exists='append', index=False)
+        conference_df.to_sql('conference_publications', engine, if_exists='append', index=False)
+        
+        print("Data loaded successfully")
+    except Exception as e:
+        print(f"Error loading data: {e}")
+
+# In Colab, you would upload the Excel file first
+from google.colab import files
+uploaded = files.upload()
+file_path = list(uploaded.keys())[0]
+
+# Then load the data
+load_faculty_data_from_excel(file_path)
+# Install required packages
+!pip install pymysql sqlalchemy pandas
+
+import pymysql
+from sqlalchemy import create_engine
+import pandas as pd
+
+# Database connection function
+def connect_to_db():
+    try:
+        # Replace with your actual credentials
+        connection = pymysql.connect(
+            host='your-rds-endpoint.rds.amazonaws.com',
+            user='admin',
+            password='yourpassword',
+            database='faculty_research_db',
+            port=3306
+        )
+        print("Successfully connected to the database")
+        return connection
+    except Exception as e:
+        print(f"Error connecting to database: {e}")
+        return None
+
+# Example data insertion function
+def insert_journal_publication(conn, faculty_id, data):
+    try:
+        with conn.cursor() as cursor:
+            sql = """
+            INSERT INTO journal_publications 
+            (faculty_id, author_position, journal_name, paper_title, publication_date, 
+             volume_issue, paper_link, publication_type, doi)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            cursor.execute(sql, (
+                faculty_id, data['author_position'], data['journal_name'], 
+                data['paper_title'], data['publication_date'], data['volume_issue'],
+                data['paper_link'], data['publication_type'], data['doi']
+            ))
+        conn.commit()
+        print("Journal publication added successfully")
+    except Exception as e:
+        print(f"Error inserting journal publication: {e}")
+
+# Example query function
+def get_faculty_publications(conn, faculty_name):
+    try:
+        query = """
+        SELECT j.paper_title, j.journal_name, j.publication_date, j.publication_type
+        FROM journal_publications j
+        JOIN faculty f ON j.faculty_id = f.faculty_id
+        WHERE f.name = %s
+        ORDER BY j.publication_date DESC
+        """
+        df = pd.read_sql(query, conn, params=[faculty_name])
+        return df
+    except Exception as e:
+        print(f"Error fetching publications: {e}")
+        return pd.DataFrame()
+
+# Example usage in Colab
+def main():
+    # Connect to database
+    conn = connect_to_db()
+    if conn is None:
+        return
+    
+    try:
+        # Example data insertion
+        journal_data = {
+            'author_position': 1,
+            'journal_name': 'Journal of Advanced Computing',
+            'paper_title': 'Machine Learning in Education',
+            'publication_date': '2023-05-15',
+            'volume_issue': 'Vol 12, Issue 3',
+            'paper_link': 'https://example.com/paper123',
+            'publication_type': 'SCOPUS',
+            'doi': '10.1234/abcd123'
+        }
+        insert_journal_publication(conn, 1, journal_data)
+        
+        # Example query
+        publications = get_faculty_publications(conn, "Dr. Smith")
+        print("\nFaculty Publications:")
+        print(publications)
+        
+    finally:
+        conn.close()
+
+if __name__ == "__main__":
+    main()
